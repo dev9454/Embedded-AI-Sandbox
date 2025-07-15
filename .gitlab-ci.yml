@@ -1,0 +1,136 @@
+image: "gitlab.aptiv.today:4567/embedded-ai-factory/tools/foundry:latest"
+
+# This file is a template, and might need editing before it works on your project.
+# This is a sample GitLab CI/CD configuration file that should run without any modifications.
+# It demonstrates a basic 3 stage CI/CD pipeline. Instead of real tests or scripts,
+# it uses echo commands to simulate the pipeline execution.
+#
+# A pipeline is composed of independent jobs that run scripts, grouped into stages.
+# Stages run in sequential order, but jobs within stages run in parallel.
+#
+# For more information, see: https://docs.gitlab.com/ee/ci/yaml/index.html#stages
+#
+# You can copy and paste this template into a new `.gitlab-ci.yml` file.
+# You should not add this template to an existing `.gitlab-ci.yml` file by using the `include:` keyword.
+#
+# To contribute improvements to CI/CD templates, please follow the Development guide at:
+# https://docs.gitlab.com/ee/development/cicd/templates.html
+# This specific template is located at:
+# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Getting-Started.gitlab-ci.yml
+
+stages:          # List of stages for jobs, and their order of execution
+  - test
+  - release
+
+.is_on_default_branch: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+.is_on_new_release: $CI_COMMIT_TAG && $CI_COMMIT_REF_PROTECTED == "true" # A new release occurs when a protected tag (v*, e.g. v1.2.3) was pushed
+
+.only_on_default_branch:
+    rules:
+        - if: !reference [.is_on_default_branch]
+
+.only_on_new_release:
+    rules:
+        - if: !reference [.is_on_new_release]
+
+
+
+unit-test-job:   # This job runs in the test stage.
+  stage: test    # It only starts when the job in the build stage completes successfully.
+  image: "gitlab.aptiv.today:4567/embedded-ai-factory/tools/foundry/ti:latest"
+  tags:
+    - aiml
+  script:
+    - echo "Running unit tests.."
+    - pytest -m unit --junitxml=report-foundry.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report-foundry.xml
+
+ti-tda4vh-test-job:   # This job runs in the test stage.
+  stage: test    # It only starts when the job in the build stage completes successfully.
+  image: "gitlab.aptiv.today:4567/embedded-ai-factory/tools/foundry/ti:latest"
+  tags:
+    - aiml
+  script:
+    - echo "Running tests for ti-tda4vh"
+    - pytest -m ti --junitxml=report-foundry.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report-foundry.xml
+
+ambarella-cv3-test-job:   # This job runs in the test stage.
+  stage: test    # It only starts when the job in the build stage completes successfully.
+  image: "gitlab.aptiv.today:4567/embedded-ai-factory/tools/foundry:latest"
+  tags:
+    - aiml
+  script:
+    - pip3 install pytest
+    - echo "Running tests on ambarella-cv3"
+    - pytest -m ambarella  --junitxml=report-foundry.xml
+  artifacts:
+    when: always
+    reports:
+      junit: report-foundry.xml
+
+
+lint-test-job:   # This job also runs in the test stage.
+  stage: test    # It can run at the same time as unit-test-job (in parallel).
+  script:
+    #Add python linters at this stage. Give warning but dont' make the pipeline fail    -
+    - pip3 install pylint flake8
+    - echo "Running linters..."
+    - pylint **/*.py || true
+    - flake8 . || true
+  allow_failure: true
+
+create_gitlab_release:
+    stage: release
+    image: registry.gitlab.com/gitlab-org/release-cli:latest
+    extends:
+        - .only_on_new_release
+    script:
+        - PACKAGE_VERSION=${CI_COMMIT_TAG#v}
+        - PACKAGE_REGISTRY_URL=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/foundry/${PACKAGE_VERSION}
+        - echo $CI_COMMIT_TAG
+        - echo ${CI_COMMIT_TAG}
+        - echo ${CI_COMMIT_DESCRIPTION}
+        - |
+            release-cli create --name "$CI_COMMIT_TAG" --tag-name $CI_COMMIT_TAG \
+              --description "${CI_COMMIT_DESCRIPTION}"
+
+semantic_release:
+  image: node:20
+  stage: release
+  when: manual
+  before_script:
+    - export https_proxy=http://proxy.aptiv.today:8080
+    - export http_proxy=http://proxy.aptiv.today:8080
+    - npm install -D
+      semantic-release
+      @semantic-release/git
+      @semantic-release/exec
+      @semantic-release/changelog
+      conventional-changelog-conventionalcommits
+  script:
+    - npx semantic-release
+  
+semantic_release_dry_run:
+  image: node:20
+  stage: release
+  when: manual
+  before_script:
+    - export https_proxy=http://proxy.aptiv.today:8080
+    - export http_proxy=http://proxy.aptiv.today:8080
+    - npm install -D
+      semantic-release
+      @semantic-release/git
+      @semantic-release/exec
+      @semantic-release/changelog
+      conventional-changelog-conventionalcommits
+  script:
+    - npx semantic-release --dry-run
+
+

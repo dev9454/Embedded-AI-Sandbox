@@ -1,0 +1,34 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.env
+.venv/
+venv/
+
+# Distribution / build
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Cache
+*.cache
+
+# out
+out/
+
+# Pytest artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+#Vscode artifacts
+.vscode
